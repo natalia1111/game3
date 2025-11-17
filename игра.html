@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Численность населения мира и её динамика. Миграции населения — игра</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#faf7f2;
+      --paper:#fffaf0;
+      --ink:#2f2a26;
+      --accent:#7c9a92;
+      --accent2:#c88f6b;
+      --good:#3c9b5f;
+      --bad:#b44d4d;
+      --muted:#7a6f66;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,"Noto Sans",Arial,sans-serif}
+    header{
+      background:linear-gradient(90deg,#e9dfcf,#efe7dc);
+      padding:16px 20px;border-bottom:1px solid #e3d8c6; position:sticky; top:0; z-index:10;
+    }
+    h1{font-size:22px;margin:0 0 6px}
+    header p{margin:0;color:var(--muted);font-size:14px}
+    main{max-width:1000px;margin:24px auto;padding:0 16px 40px}
+    .wrap{
+      display:grid;grid-template-columns:1fr;gap:16px;
+    }
+    @media(min-width:900px){
+      .wrap{grid-template-columns:1.1fr 0.9fr}
+    }
+    .card{
+      background:var(--paper);border:1px solid #e5d9c6;border-radius:12px;padding:16px;box-shadow:0 2px 6px rgba(0,0,0,.04)
+    }
+    .card h2{font-size:18px;margin:0 0 10px}
+    .card h3{font-size:16px;margin:16px 0 8px;color:var(--muted)}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    button{
+      background:#f1e7d7;border:1px solid #d7c8af;color:var(--ink);
+      padding:10px 12px;border-radius:8px;cursor:pointer;transition:.15s;
+    }
+    button:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,0.06)}
+    button.primary{background:var(--accent);border-color:#6a867e;color:#fff}
+    button.secondary{background:#e8efe8;border-color:#cbd6cf}
+    button.good{background:var(--good);border-color:#31824f;color:#fff}
+    button.bad{background:var(--bad);border-color:#9a3f3f;color:#fff}
+    .pill{display:inline-block;padding:6px 10px;border:1px dashed #d8c9b1;border-radius:999px;background:#fbf5ea;font-size:12px;color:var(--muted)}
+    .stat{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .stat .item{background:#f7efe0;border:1px solid #e2d4bf;border-radius:8px;padding:8px 10px;font-size:13px}
+    .question{margin-top:10px;padding:10px;border-radius:8px;background:#fff;border:1px solid #eadfc9}
+    .options{display:grid;gap:8px;margin-top:10px}
+    .option{padding:10px;border:1px solid #d9cbb5;border-radius:8px;background:#fff;cursor:pointer}
+    .option.correct{border-color:#3c9b5f;background:#eaf6ee}
+    .option.wrong{border-color:#b44d4d;background:#f9e9e9}
+    .hint{margin-top:8px;color:#6b655e;font-size:13px}
+    .progress{height:10px;background:#eee;border-radius:999px;overflow:hidden;margin:10px 0;border:1px solid #e0d5c3}
+    .bar{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+    .mini{font-size:12px;color:var(--muted)}
+    .slider-row{display:grid;grid-template-columns:140px 1fr 60px;gap:8px;align-items:center;margin:8px 0}
+    input[type="range"]{width:100%}
+    canvas{width:100%;height:220px;background:#fff;border:1px solid #eadfc9;border-radius:8px}
+    .legend{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0}
+    .legend .dot{width:10px;height:10px;border-radius:50%}
+    .map{
+      background:#fff;border:1px solid #eadfc9;border-radius:8px;padding:10px;position:relative;min-height:240px;
+    }
+    .region{display:flex;justify-content:space-between;align-items:center;border:1px dashed #d8c9b1;padding:8px;border-radius:8px;margin:6px 0;background:#fbf7ee}
+    .flow{font-size:12px;color:var(--muted)}
+    .footer-note{margin-top:12px;font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Игра: «Численность населения мира и её динамика. Миграции населения»</h1>
+    <p>Отвечайте на вопросы, моделируйте демографию, изучайте миграционные потоки. Наберите максимум очков.</p>
+  </header>
+
+  <main>
+    <div class="wrap">
+
+      <!-- Левая колонка: Викторина + Модель демографии -->
+      <section class="card" id="quizCard">
+        <h2>Викторина по демографии и миграции</h2>
+
+        <div class="row">
+          <span class="pill" id="modePill">Режим: базовый</span>
+          <button class="secondary" id="toggleModeBtn">Сложнее</button>
+          <button class="primary" id="nextBtn">Следующий вопрос</button>
+          <button class="secondary" id="resetQuizBtn">Сбросить</button>
+        </div>
+
+        <div class="stat" id="quizStat">
+          <div class="item"><strong>Очки:</strong> <span id="score">0</span></div>
+          <div class="item"><strong>Вопрос:</strong> <span id="qIndex">1</span>/<span id="qTotal">10</span></div>
+          <div class="item"><strong>Точность:</strong> <span id="accuracy">—</span></div>
+          <div class="item"><strong>Время на вопрос:</strong> <span id="timer">20</span> сек</div>
+        </div>
+
+        <div class="progress"><div class="bar" id="progressBar"></div></div>
+
+        <div class="question" id="questionBox">
+          <h3>Вопрос</h3>
+          <div id="qText">Нажмите «Следующий вопрос», чтобы начать.</div>
+          <div class="options" id="qOptions"></div>
+          <div class="hint" id="qHint"></div>
+        </div>
+
+        <h3>Мини-задача: классификация миграции</h3>
+        <div class="row">
+          <button id="miniInternal" class="secondary">Внутренняя миграция</button>
+          <button id="miniExternal" class="secondary">Внешняя миграция</button>
+          <button id="miniForced" class="secondary">Вынужденная миграция</button>
+          <span class="mini" id="miniResult"></span>
+        </div>
+      </section>
+
+      <section class="card" id="modelCard">
+        <h2>Интерактивная модель динамики населения</h2>
+        <p>Настройте коэффициенты рождаемости, смертности и миграционного баланса. Наблюдайте изменение численности.</p>
+
+        <div class="slider-row">
+          <strong>Численность (млн):</strong>
+          <input type="range" id="popStart" min="1" max="8000" step="10" value="8000">
+          <span id="popStartVal">8000</span>
+        </div>
+        <div class="slider-row">
+          <strong>Рождаемость (% в год):</strong>
+          <input type="range" id="birthRate" min="0" max="5" step="0.1" value="1.2">
+          <span id="birthVal">1.2</span>
+        </div>
+        <div class="slider-row">
+          <strong>Смертность (% в год):</strong>
+          <input type="range" id="deathRate" min="0" max="5" step="0.1" value="0.9">
+          <span id="deathVal">0.9</span>
+        </div>
+        <div class="slider-row">
+          <strong>Миграция (‰ в год):</strong>
+          <input type="range" id="netMig" min="-10" max="10" step="0.5" value="0">
+          <span id="migVal">0.0</span>
+        </div>
+
+        <div class="row">
+          <button class="primary" id="simulateBtn">Симулировать 30 лет</button>
+          <button class="secondary" id="resetModelBtn">Сброс модели</button>
+        </div>
+
+        <div class="legend">
+          <div class="dot" style="background:#7c9a92"></div><span class="mini">Численность (млн)</span>
+          <div class="dot" style="background:#c88f6b"></div><span class="mini">Годовой прирост (%)</span>
+        </div>
+        <canvas id="chart" width="800" height="220"></canvas>
+        <div class="footer-note">Примечание: простая модель с фиксированными коэффициентами; миграция в промилле (‰).</div>
+      </section>
+
+      <!-- Правая колонка: Карта потоков и задания -->
+      <section class="card" id="flowsCard">
+        <h2>Учебная карта миграционных потоков</h2>
+        <p>Выберите регионы: добавляйте потоки и наблюдайте «приток/отток» населения.</p>
+
+        <div class="row">
+          <select id="fromSelect"></select>
+          <span>→</span>
+          <select id="toSelect"></select>
+          <input type="number" id="flowValue" min="0" step="50" value="200" style="width:100px" />
+          <button class="primary" id="addFlowBtn">Добавить поток (тыс.)</button>
+          <button class="secondary" id="resetFlowsBtn">Сброс</button>
+        </div>
+
+        <div class="map" id="mapBox">
+          <!-- Сводка по регионам -->
+          <div id="regionsBox"></div>
+        </div>
+
+        <div class="footer-note">Подсказка: отток уменьшает население региона-источника, приток — увеличивает население региона-получателя.</div>
+      </section>
+
+      <section class="card" id="tasksCard">
+        <h2>Задания на применение</h2>
+        <ol>
+          <li><strong>Сценарий «Старение населения»:</strong> Уменьшите рождаемость до 0.8%, смертность до 1.4%. Что происходит с численностью за 30 лет?</li>
+          <li><strong>Сценарий «Миграционный приток»:</strong> Установите рождаемость 1.0%, смертность 0.9%, миграцию +4‰. Как меняется прирост?</li>
+          <li><strong>Карта потоков:</strong> Смоделируйте перемещение 500 тыс. из «Латинская Америка» в «Северная Америка». Как меняется баланс?</li>
+          <li><strong>Сравнение регионов:</strong> Создайте два потока в противоположных направлениях между «Азия» и «Европа». Где итоговый приток больше?</li>
+        </ol>
+      </section>
+
+    </div>
+  </main>
+
+  <script>
+    // ---------- Викторина ----------
+    const quizDataBase = [
+      {
+        q: "Что называют естественным приростом населения?",
+        options: [
+          "Сумма рождаемости и смертности",
+          "Разность рождаемости и смертности",
+          "Число мигрантов за год",
+          "Изменение численности из-за урбанизации"
+        ],
+        correct: 1,
+        hint: "Естественный прирост учитывает только рождаемость и смертность."
+      },
+      {
+        q: "Что такое миграционный баланс (нетто-миграция)?",
+        options: [
+          "Число прибывших",
+          "Число выбывших",
+          "Разность прибывших и выбывших",
+          "Средний возраст мигрантов"
+        ],
+        correct: 2,
+        hint: "Баланс = прибывшие − выбывшие."
+      },
+      {
+        q: "Какой из факторов напрямую повышает численность населения?",
+        options: [
+          "Рост смертности",
+          "Снижение рождаемости",
+          "Положительная нетто-миграция",
+          "Эмиграция"
+        ],
+        correct: 2,
+        hint: "Положительная нетто-миграция = приток."
+      },
+      {
+        q: "Как измеряют миграцию в демографии чаще всего?",
+        options: [
+          "В промилле (‰) на 1000 человек",
+          "В процентах (%) от ВВП",
+          "В дюжинах на район",
+          "В часах на человека"
+        ],
+        correct: 0,
+        hint: "Миграция часто выражается в ‰."
+      },
+      {
+        q: "Что такое «демографический переход»?",
+        options: [
+          "Внезапная миграция в соседнюю страну",
+          "Постепенное снижение рождаемости и смертности по стадиям",
+          "Ускорение естественного прироста навсегда",
+          "Административная реформа переписи"
+        ],
+        correct: 1,
+        hint: "Классическая модель описывает смену режимов рождаемости/смертности."
+      },
+      {
+        q: "Если рождаемость 1.5% и смертность 1.0%, каков естественный прирост?",
+        options: [
+          "0.5%",
+          "2.5%",
+          "−0.5%",
+          "1.0‰"
+        ],
+        correct: 0,
+        hint: "ЕП = рождаемость − смертность."
+      },
+      {
+        q: "Что верно про внутреннюю миграцию?",
+        options: [
+          "Пересечение международной границы обязательно",
+          "Перемещение внутри одной страны",
+          "Всегда вынужденная",
+          "Только сельско-городская"
+        ],
+        correct: 1,
+        hint: "Внутренняя = внутри страны."
+      },
+      {
+        q: "Урбанизация чаще всего связана с…",
+        options: [
+          "Перемещением из города в сельскую местность",
+          "Перемещением из сельской местности в города",
+          "Снижением плотности населения",
+          "Отменой переписи"
+        ],
+        correct: 1,
+        hint: "Рост доли городского населения."
+      },
+      {
+        q: "Эмиграция — это…",
+        options: [
+          "Въезд в страну",
+          "Выезд из страны",
+          "Внутренний переезд",
+          "Вынужденная миграция"
+        ],
+        correct: 1,
+        hint: "Иммиграция — въезд, эмиграция — выезд."
+      },
+      {
+        q: "Что может снизить темпы роста населения при прочих равных?",
+        options: [
+          "Повышение рождаемости",
+          "Снижение смертности",
+          "Отрицательная нетто-миграция",
+          "Положительная нетто-миграция"
+        ],
+        correct: 2,
+        hint: "Отток уменьшает численность."
+      }
+    ];
+
+    const quizDataAdvanced = [
+      {
+        q: "На стадии III демографического перехода обычно наблюдается…",
+        options: [
+          "Высокая рождаемость и высокая смертность",
+          "Снижение смертности при высокой рождаемости",
+          "Снижение рождаемости при низкой смертности",
+          "Резкий естественный убыль"
+        ],
+        correct: 2,
+        hint: "Стадия III — падение рождаемости, смертность уже низкая."
+      },
+      {
+        q: "Если нетто-миграция −3‰, это значит…",
+        options: [
+          "Приток 3 на тысячу",
+          "Отток 3 на тысячу",
+          "Естественный прирост 3%",
+          "Рост урбанизации на 3%"
+        ],
+        correct: 1,
+        hint: "Отрицательная величина — отток."
+      },
+      {
+        q: "При населении 50 млн и приросте 1% год, прирост за год примерно…",
+        options: [
+          "500 тыс.",
+          "50 тыс.",
+          "5 млн",
+          "5 тыс."
+        ],
+        correct: 0,
+        hint: "1% от 50 млн = 0.5 млн."
+      },
+      {
+        q: "Старение населения обычно связано с…",
+        options: [
+          "Ростом рождаемости",
+          "Снижением смертности в младших возрастах и низкой рождаемостью",
+          "Иммиграцией только молодых",
+          "Отсутствием миграции"
+        ],
+        correct: 1,
+        hint: "Комбинация низкой рождаемости и высокой продолжительности жизни."
+      },
+      {
+        q: "Миграция по экономическим причинам чаще всего…",
+        options: [
+          "Вынужденная",
+          "Добровольная",
+          "Только сезонная",
+          "Только внутренняя"
+        ],
+        correct: 1,
+        hint: "Ищут работу/доход — добровольная мотивация."
+      },
+      {
+        q: "Если естественный прирост −0.2%, а нетто-миграция +4‰, общий прирост около…",
+        options: [
+          "+0.2%",
+          "+0.6%",
+          "0%",
+          "−0.6%"
+        ],
+        correct: 1,
+        hint: "4‰ ≈ 0.4%; −0.2% + 0.4% = +0.2% (проверьте варианты)"
+      },
+      {
+        q: "Какая мера снижает отток квалифицированных кадров («утечку мозгов»)?",
+        options: [
+          "Снижение оплаты труда",
+          "Развитие научной инфраструктуры и условий работы",
+          "Увеличение барьеров на выезд",
+          "Сокращение образования"
+        ],
+        correct: 1,
+        hint: "Условия и возможности внутри страны — ключевые."
+      },
+      {
+        q: "Иммиграция может компенсировать…",
+        options: [
+          "Высокую смертность при низкой рождаемости",
+          "Недостаток рабочих кадров при старении",
+          "Рост плотности населения в сельской местности",
+          "Снижение ВВП в краткосрочном периоде всегда"
+        ],
+        correct: 1,
+        hint: "Заполнение вакансий, демографический баланс."
+      },
+      {
+        q: "Плотность населения — это…",
+        options: [
+          "Численность на единицу площади",
+          "Число городов",
+          "Доля детей",
+          "Нетто-миграция"
+        ],
+        correct: 0,
+        hint: "Люди/км² — базовая метрика."
+      },
+      {
+        q: "Что чаще сопровождает массовые вынужденные миграции?",
+        options: [
+          "Климатическая стабильность",
+          "Конфликты, катастрофы, преследования",
+          "Рост рождаемости",
+          "Снижение смертности"
+        ],
+        correct: 1,
+        hint: "Факторы риска и насилия."
+      }
+    ];
+
+    let quizAdvanced = false;
+    let quizData = quizDataBase.slice();
+    let qIndex = 0, score = 0, answered = 0, correctCount = 0;
+    let timer = 20, timerId = null;
+
+    const modePill = document.getElementById('modePill');
+    const toggleModeBtn = document.getElementById('toggleModeBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const resetQuizBtn = document.getElementById('resetQuizBtn');
+    const qText = document.getElementById('qText');
+    const qOptions = document.getElementById('qOptions');
+    const qHint = document.getElementById('qHint');
+    const scoreEl = document.getElementById('score');
+    const qIndexEl = document.getElementById('qIndex');
+    const qTotalEl = document.getElementById('qTotal');
+    const accuracyEl = document.getElementById('accuracy');
+    const timerEl = document.getElementById('timer');
+    const progressBar = document.getElementById('progressBar');
+
+    function updateStats(){
+      qIndexEl.textContent = Math.min(qIndex+1, quizData.length);
+      qTotalEl.textContent = quizData.length;
+      scoreEl.textContent = score;
+      accuracyEl.textContent = answered ? Math.round((correctCount/answered)*100) + "%" : "—";
+      progressBar.style.width = ((answered/quizData.length)*100) + "%";
+    }
+
+    function startTimer(){
+      clearInterval(timerId);
+      timer = 20;
+      timerEl.textContent = timer;
+      timerId = setInterval(()=>{
+        timer--;
+        timerEl.textContent = timer;
+        if(timer<=0){
+          clearInterval(timerId);
+          lockOptions();
+          qHint.textContent = "Время вышло. Подсказка: " + quizData[qIndex].hint;
+          answered++;
+          updateStats();
+        }
+      },1000);
+    }
+
+    function renderQuestion(){
+      if(qIndex >= quizData.length){
+        qText.textContent = "Игра окончена! Ваш результат: " + score + " очков. Сбросьте, чтобы начать заново или переключите режим.";
+        qOptions.innerHTML = "";
+        qHint.textContent = "";
+        clearInterval(timerId);
+        return;
+      }
+      const q = quizData[qIndex];
+      qText.textContent = q.q;
+      qOptions.innerHTML = "";
+      qHint.textContent = "";
+      q.options.forEach((opt, idx)=>{
+        const div = document.createElement('div');
+        div.className = 'option';
+        div.textContent = opt;
+        div.addEventListener('click', ()=>pickOption(idx, div));
+        qOptions.appendChild(div);
+      });
+      updateStats();
+      startTimer();
+    }
+
+    function lockOptions(){
+      [...qOptions.children].forEach(el=>{
+        el.style.pointerEvents = 'none';
+      });
+    }
+
+    function pickOption(idx, el){
+      const q = quizData[qIndex];
+      lockOptions();
+      answered++;
+      if(idx === q.correct){
+        correctCount++;
+        score += Math.max(5, timer); // быстрее — больше очков
+        el.classList.add('correct');
+        qHint.textContent = "Верно! " + q.hint;
+      } else {
+        el.classList.add('wrong');
+        qHint.textContent = "Неверно. " + q.hint;
+      }
+      updateStats();
+    }
+
+    nextBtn.addEventListener('click', ()=>{
+      if(qIndex < quizData.length) qIndex++;
+      renderQuestion();
+    });
+
+    resetQuizBtn.addEventListener('click', ()=>{
+      quizData = (quizAdvanced ? quizDataAdvanced : quizDataBase).slice();
+      qIndex = 0; score = 0; answered = 0; correctCount = 0;
+      renderQuestion();
+    });
+
+    toggleModeBtn.addEventListener('click', ()=>{
+      quizAdvanced = !quizAdvanced;
+      modePill.textContent = "Режим: " + (quizAdvanced ? "продвинутый" : "базовый");
+      toggleModeBtn.textContent = quizAdvanced ? "Проще" : "Сложнее";
+      quizData = (quizAdvanced ? quizDataAdvanced : quizDataBase).slice();
+      qIndex = 0; score = 0; answered = 0; correctCount = 0;
+      renderQuestion();
+    });
+
+    // Мини-задача классификации
+    document.getElementById('miniInternal').addEventListener('click', ()=>{
+      document.getElementById('miniResult').textContent = "Внутренняя миграция: перемещение внутри одной страны (например, из села в город).";
+    });
+    document.getElementById('miniExternal').addEventListener('click', ()=>{
+      document.getElementById('miniResult').textContent = "Внешняя миграция: пересечение международной границы (иммиграция/эмиграция).";
+    });
+    document.getElementById('miniForced').addEventListener('click', ()=>{
+      document.getElementById('miniResult').textContent = "Вынужденная миграция: вызвана конфликтами, катастрофами, преследованием.";
+    });
+
+    // ---------- Модель динамики ----------
+    const popStart = document.getElementById('popStart');
+    const birthRate = document.getElementById('birthRate');
+    const deathRate = document.getElementById('deathRate');
+    const netMig = document.getElementById('netMig');
+    const popStartVal = document.getElementById('popStartVal');
+    const birthVal = document.getElementById('birthVal');
+    const deathVal = document.getElementById('deathVal');
+    const migVal = document.getElementById('migVal');
+    const simulateBtn = document.getElementById('simulateBtn');
+    const resetModelBtn = document.getElementById('resetModelBtn');
+
+    [popStart,birthRate,deathRate,netMig].forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        popStartVal.textContent = popStart.value;
+        birthVal.textContent = Number(birthRate.value).toFixed(1);
+        deathVal.textContent = Number(deathRate.value).toFixed(1);
+        migVal.textContent = Number(netMig.value).toFixed(1);
+      });
+    });
+
+    const canvas = document.getElementById('chart');
+    const ctx = canvas.getContext('2d');
+
+    function drawAxes(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      // рамка
+      ctx.strokeStyle = '#eadfc9';
+      ctx.strokeRect(0,0,canvas.width,canvas.height);
+      // ось X и Y
+      ctx.strokeStyle = '#cdbfa8';
+      ctx.beginPath();
+      ctx.moveTo(40,10); ctx.lineTo(40,200); ctx.lineTo(780,200);
+      ctx.stroke();
+      // сетка
+      ctx.strokeStyle = '#eee';
+      for(let y=40;y<=200;y+=40){
+        ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(780,y); ctx.stroke();
+      }
+    }
+
+    function simulateYears(P0, birthPct, deathPct, migPerMille, years=30){
+      const pop = [P0];
+      const growth = [];
+      for(let t=1;t<=years;t++){
+        const gPct = birthPct - deathPct + (migPerMille/10)/10; // миграция ‰ -> %
+        const Pprev = pop[pop.length-1];
+        const Pnext = Pprev * (1 + gPct/100);
+        pop.push(Pnext);
+        growth.push(gPct);
+      }
+      return {pop, growth};
+    }
+
+    function plot(pop, growth){
+      drawAxes();
+      const maxPop = Math.max(...pop);
+      const minPop = Math.min(...pop);
+      const rangePop = maxPop - minPop || 1;
+      const x0 = 40, y0 = 200, w = 740, h = 180;
+
+      // Линия населения
+      ctx.strokeStyle = '#7c9a92';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      pop.forEach((P, i)=>{
+        const x = x0 + (i/pop.length)*w;
+        const y = y0 - ((P - minPop)/rangePop)*h;
+        if(i===0){ctx.moveTo(x,y)} else {ctx.lineTo(x,y)}
+      });
+      ctx.stroke();
+
+      // Линия прироста
+      const maxG = Math.max(...growth);
+      const minG = Math.min(...growth);
+      const rangeG = maxG - minG || 1;
+
+      ctx.strokeStyle = '#c88f6b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      growth.forEach((g,i)=>{
+        const x = x0 + ((i+1)/pop.length)*w; // growth length = pop.length-1
+        const y = y0 - ((g - minG)/rangeG)*h;
+        if(i===0){ctx.moveTo(x,y)} else {ctx.lineTo(x,y)}
+      });
+      ctx.stroke();
+
+      // Подписи
+      ctx.fillStyle = '#6b655e';
+      ctx.font = '12px system-ui';
+      ctx.fillText('Годы', 730, 215);
+      ctx.fillText('Численность', 42, 22);
+      ctx.fillText('Прирост (%)', 640, 22);
+    }
+
+    simulateBtn.addEventListener('click', ()=>{
+      const P0 = Number(popStart.value);
+      const b = Number(birthRate.value);
+      const d = Number(deathRate.value);
+      const m = Number(netMig.value); // ‰
+      const {pop, growth} = simulateYears(P0, b, d, m, 30);
+      plot(pop, growth);
+    });
+
+    resetModelBtn.addEventListener('click', ()=>{
+      popStart.value = 8000; birthRate.value = 1.2; deathRate.value = 0.9; netMig.value = 0.0;
+      popStartVal.textContent = 8000; birthVal.textContent = '1.2'; deathVal.textContent = '0.9'; migVal.textContent = '0.0';
+      drawAxes();
+    });
+
+    drawAxes();
+
+    // ---------- Карта потоков ----------
+    const regions = [
+      { name: "Азия", pop: 4700 },
+      { name: "Африка", pop: 1400 },
+      { name: "Европа", pop: 750 },
+      { name: "Северная Америка", pop: 600 },
+      { name: "Латинская Америка", pop: 660 },
+      { name: "Океания", pop: 45 }
+    ];
+
+    const fromSelect = document.getElementById('fromSelect');
+    const toSelect = document.getElementById('toSelect');
+    const flowValue = document.getElementById('flowValue');
+    const addFlowBtn = document.getElementById('addFlowBtn');
+    const resetFlowsBtn = document.getElementById('resetFlowsBtn');
+    const regionsBox = document.getElementById('regionsBox');
+
+    function populateSelects(){
+      fromSelect.innerHTML = "";
+      toSelect.innerHTML = "";
+      regions.forEach((r, idx)=>{
+        const opt1 = document.createElement('option'); opt1.value = idx; opt1.textContent = r.name;
+        const opt2 = document.createElement('option'); opt2.value = idx; opt2.textContent = r.name;
+        fromSelect.appendChild(opt1); toSelect.appendChild(opt2);
+      });
+      toSelect.selectedIndex = 3; // по умолчанию: в Северную Америку
+    }
+
+    function renderRegions(){
+      regionsBox.innerHTML = "";
+      regions.forEach((r, idx)=>{
+        const div = document.createElement('div');
+        div.className = 'region';
+        const left = document.createElement('div');
+        left.innerHTML = `<strong>${r.name}</strong><br><span class="mini">Численность: ${r.pop.toLocaleString('ru-RU')} млн</span>`;
+        const right = document.createElement('div');
+        right.className = 'flow';
+        right.id = 'flow-'+idx;
+        right.textContent = "Приток: 0 тыс. | Отток: 0 тыс.";
+        div.appendChild(left); div.appendChild(right);
+        regionsBox.appendChild(div);
+      });
+    }
+
+    const flowStats = regions.map(()=>({in:0, out:0}));
+
+    function addFlow(){
+      const from = Number(fromSelect.value);
+      const to = Number(toSelect.value);
+      const val = Math.max(0, Number(flowValue.value)); // тыс. человек
+      if(isNaN(from) || isNaN(to) || from===to) return;
+      flowStats[from].out += val;
+      flowStats[to].in += val;
+      // Перевод тысяч человек в млн
+      const delta = val/1000;
+      regions[from].pop = Math.max(0, regions[from].pop - delta);
+      regions[to].pop += delta;
+      updateRegionRow(from);
+      updateRegionRow(to);
+    }
+
+    function updateRegionRow(idx){
+      const r = regions[idx];
+      const fs = flowStats[idx];
+      const el = document.getElementById('flow-'+idx);
+      el.textContent = `Приток: ${fs.in.toLocaleString('ru-RU')} тыс. | Отток: ${fs.out.toLocaleString('ru-RU')} тыс.`;
+      // Маленький визуальный всплеск цвета
+      const regionEl = el.parentElement;
+      regionEl.style.background = '#fff';
+      setTimeout(()=>{regionEl.style.background = '#fbf7ee'},180);
+      // Также обновим численность на левом блоке
+      regionEl.querySelector('.mini').textContent = `Численность: ${r.pop.toLocaleString('ru-RU')} млн`;
+    }
+
+    addFlowBtn.addEventListener('click', addFlow);
+
+    resetFlowsBtn.addEventListener('click', ()=>{
+      for(let i=0;i<flowStats.length;i++){flowStats[i].in=0; flowStats[i].out=0;}
+      // Восстановим базовые значения
+      regions[0].pop = 4700;
+      regions[1].pop = 1400;
+      regions[2].pop = 750;
+      regions[3].pop = 600;
+      regions[4].pop = 660;
+      regions[5].pop = 45;
+      renderRegions();
+    });
+
+    populateSelects();
+    renderRegions();
+
+    // Клавиатурные сокращения
+    document.addEventListener('keydown', (e)=>{
+      if(e.key==='n'){ nextBtn.click(); }
+      if(e.key==='s'){ simulateBtn.click(); }
+    });
+  </script>
+</body>
